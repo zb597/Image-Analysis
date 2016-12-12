@@ -1,0 +1,59 @@
+%%% Acknowledgements to David Richards for his advise and help with the
+%%% image analysis and for significantly making the original code much
+%%% better!
+
+%Parameters
+SQ_SIZE = 50;
+THRESHOLD1 = 1.1;
+MIN_AREA = 100;
+
+I = imread('glu_undiluted2_500ms.tiff'); %read image - insert imagename.filetype
+w = size(I,1);
+h = size(I,2);
+I = double(I); %double-precision value for I (I is a matrix)
+I = I / max(I(:)); %not working in integers
+subplot(2,4,1); imshow(I);
+
+I2 = imadjust(I); %maps the intensity values in grayscale image I to new values in J such that 1% of data is saturated at low and high intensities of I. This increases the contrast of the output image J.
+subplot(2,4,2); imshow(I2);
+
+%binary (B&W) image
+BW = zeros(w,h,'double');
+for i = 1+SQ_SIZE:w-SQ_SIZE
+    if (mod(i-SQ_SIZE,100)==0); fprintf('%d%% ',round((i-SQ_SIZE)/(w-2*SQ_SIZE)*100)); end;
+    curr_sum = sum(sum(I2(i-SQ_SIZE:i+SQ_SIZE,1:1+2*SQ_SIZE)));
+    for j = 1+SQ_SIZE+1:h-SQ_SIZE
+        curr_sum = curr_sum - sum(I2(i-SQ_SIZE:i+SQ_SIZE,j-SQ_SIZE-1)) + sum(I2(i-SQ_SIZE:i+SQ_SIZE,j+SQ_SIZE));
+        av_int = ( curr_sum - I2(i,j) ) / ( 4*SQ_SIZE*(SQ_SIZE+1) );
+        if ( I2(i,j)/av_int > THRESHOLD1 )
+            BW(i,j) = 1;
+        end
+    end
+end
+fprintf('\n');
+subplot(2,4,3); imshow(BW);
+
+BW = bwareaopen(BW, MIN_AREA, 4); % removes all connected components (objects) that have fewer than P pixels (in this case MIN_AREA) from the binary image BW, producing another binary image, BW - we are overwriting the old image - where the desired connectivity is 4
+subplot(2,4,4); imshow(BW);
+
+frac_mt = bwarea(BW)/(w*h); %estimates the area of the objects in binary image i - a scalar  whose value corresponds roughly to the total number of on pixels in the  image, but might not be exactly the same because different patterns of  pixels are weighted differently.
+fprintf('Fraction of MTs = %.1f%%\n',frac_mt*100);
+
+subplot(2,4,5)
+I3 = bwmorph(BW,'skel',inf); %skeletonising - applies the operation n times. n can be Inf, in which case the operation is repeated until the image no longer changes.
+imshow(I3)
+
+conn_regions = bwconncomp(BW); % returns the connected components conn_regions found in the binary image BW
+region_info = regionprops(conn_regions,'Area');
+
+subplot(2,4,6)
+%make sure the area vector is the region_info in the workspace for your image
+area = [220;357;1099;180;1492;145;2053;377;1370;3591;258;1169;3449;2424;2510;249;905;555;292;525;301;2233;674;1966;2391;2453;2614;764;1510;899;506;412;183;471;2277;115;2377;3625;153;2226;678;4192;165;1559;154;767;1432;516;2027;469;1717;195;421;370;344;1305;669;493;1160;132;831;469;2405;144;1027;166;509;2292;1039;1348;1357;821;1241;4109;411;616;229;1005;109;590;439;3453;969;428;241;454;382;1251;559;1894;1350;198;1292;836;512;418;1415;124;972;2326;702;1092;3291;2852;118;402;1565;128;597;557;132;874;593;1016;200;488;576;1884;1485;825;372;1899;898;1649;3257;342;150;314;1124;300;939;137;103;401;2673;19950;953;1719;3659;134;1631;2398;316;370;136;291;227;1634;1083;794;8500;1571;180;114;125;4698;457;284;861;242;390;1731;164;590;102;223;1459;273;365;242;535;117;767;115;176;1850;128;551;104;248;569;211;123;725;638;633;717;246;118;2948;187;642;504;136;104;144;297;379;1487;542;301;1907;148;171;2390;794;154;5723;414;2491;115;1988;115;109;465;607;1374;292;553;286;273;135;131;4973;133;996;303;546;148;391;1133;321;501;141;266;174;2588;455;162;1329;521;207;680;5337;760;343;442;582;397;227;1622;250;105;373;138;1050;135;118;375;1552;238;123;236;849;2899;356;344;2580;3425;265;1402;185;128;206;4970;1185;125;931;284;267;280;639;171;167;442;305;100;527;134;106;2553;548;310;576;297;2098;952;384;1260;135;392;291;304;940;877;158;1795;7585;563;152;331;532;303;734;285;385;1816;233;223;452;607;313;202];
+h = histogram(area);
+xlabel('Area of MTs (nm)')
+ylabel('Frequency')
+
+% IM2 = imerode(IM,SE) erodes the grayscale, binary, or packed binary image IM, returning the eroded image IM2. The argument SE is a structuring element object or array of structuring element objects returned by the strel or offsetstrel functions.
+% If IM is logical and the structuring element is flat, imerode performs binary erosion; otherwise it performs grayscale erosion. If SE is an array of structuring element objects, imerode performs multiple erosions of the input image, using each structuring element in SE in succession.
+% IM2 = imerode(IM,NHOOD) erodes the image IM, where NHOOD is an array of 0's and 1's that specifies the structuring element neighborhood. This is equivalent to the syntax imerode(IM,strel(NHOOD)). The imerode function determines the center element of the neighborhood by floor((size(NHOOD)+1)/2).
+% IM2 = imerode(___,PACKOPT,M) specifies whether IM is a packed binary image and, if it is, provides the row dimension M of the original unpacked image. PACKOPT can have either of the following values. Default value is enclosed in braces ({}).
